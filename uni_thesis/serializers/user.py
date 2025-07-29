@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from uni_thesis.utils import random_numeric_string
+from rest_framework.validators import UniqueTogetherValidator
 
 User = get_user_model()
 
@@ -18,50 +19,33 @@ class UserValidationMixin:
             raise serializers.ValidationError("Phone number must only contain digits!")
         return phone_number
 
-# Base Serializer for Sahred Logic
-class BaseUserSerializer(UserValidationMixin, serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = [
-            "user_id", "first_name", "last_name", "national_code", "phone_number",
-            "email", "gender", "birth_date"
-        ]
-        read_only_fields = ["user_id", "email"]
-
-    def update(self, instance, validated_data):
-        for field, value in validated_data.items():
-            setattr(instance, field, value)
-        instance.save()
-        return instance
-
-
-# Full Update
-class FullUpdateUserSerializer(BaseUserSerializer):
-    class Meta(BaseUserSerializer):
-        fields = BaseUserSerializer.Meta.fields + ["role"]
-
-
-class PartialUpdateUserSerializer(BaseUserSerializer):
-    class Meta(BaseUserSerializer):
-        fields = BaseUserSerializer.Meta.fields.remove("user_id")
-
-# user Creation
-class CreateUserSerializer(BaseUserSerializer):
-    confirm_password = serializers.CharField(max_length=20, required=True, write_only=True)
-
-    class Meta(BaseUserSerializer.Meta):
-        fields = BaseUserSerializer.Meta.fields + ["role", "password", "confirm_password"]
-        extra_kwargs = {
-            "password": {"write_only": True}
-        }
-
     def validate_password(self, password):
         validate_password(password)
         return password
 
+class UserCreateSerializer(serializers.ModelSerializer, UserValidationMixin):
+    confirm_password = serializers.CharField(write_only=True, required=True)
+
+    class Meta:
+        model = User
+        fields = [
+            "uni_id",
+            "password",
+            "confirm_password",
+            "first_name",
+            "last_name",
+            "phone_number",
+            "national_code",
+            "birth_date"
+        ]
+        extra_kwargs = {
+            "password": {"write_only": True}
+        }
+        read_only_fields = ["uni_id", "email"]
+
     def validate(self, data):
         if data["password"] != data["confirm_password"]:
-            raise serializers.ValidationError("Passwords must match!")
+            raise serializers.ValidationError({"confirm_password": "Passwords must match."})
         return data
 
     def create(self, validated_data):
@@ -69,6 +53,40 @@ class CreateUserSerializer(BaseUserSerializer):
         validated_data["uni_id"] = generate_unique_uni_id(10)
         validated_data["email"] = generate_email(validated_data)
         return User.objects.create_user(**validated_data)
+
+class UserUpdateSerializer(serializers.ModelSerializer, UserValidationMixin):
+
+    class Meta:
+        model = User
+        fields = [
+            "first_name",
+            "last_name",
+            "phone_number",
+            "national_code",
+            "birth_date"
+        ]
+
+    def get_validators(self):
+        """
+        Remove only the UniqueTogetherValidator on partial (PATCH) operations,
+        but leave all other model-level validators intact.
+        """
+        validators = super().get_validators()
+        if getattr(self, 'partial', False):
+            validators = [
+                v for v in validators
+                if not isinstance(v, UniqueTogetherValidator)
+            ]
+            print(validators)
+        return validators
+
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+
 
 def generate_unique_uni_id(n):
     return random_numeric_string(n)

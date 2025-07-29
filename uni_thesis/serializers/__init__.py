@@ -1,1 +1,2 @@
-from .user import *
+from .user import UserCreateSerializer, UserUpdateSerializer
+from .student import StudentCreateSerializer, StudentUpdateSerializer
