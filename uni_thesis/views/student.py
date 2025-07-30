@@ -5,7 +5,8 @@ from uni_thesis.permissions import IsAdminOrOwnStudentOrProfessorReadOnly
 from rest_framework.permissions import IsAuthenticated
 
 class StudentViewSet(ModelViewSet):
-    permission_classes = [IsAdminOrOwnStudentOrProfessorReadOnly, IsAuthenticated]
+    queryset = Student.objects.all()
+    permission_classes = [IsAuthenticated, IsAdminOrOwnStudentOrProfessorReadOnly]
     lookup_field = 'pk'
 
     def get_serializer_class(self, *args, **kwargs):
@@ -15,6 +16,15 @@ class StudentViewSet(ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.is_staff or user.is_superuser:
+        role = getattr(user, "role", None)
+
+        if user.is_superuser or user.is_staff or role == "Admin":
             return Student.objects.all()
-        return Student.objects.filter(user__id = user.id)
+
+        if role == "Professor":
+            return Student.objects.all()  # Or apply filtering by department, etc.
+
+        if role == "Student":
+            return Student.objects.filter(user__id=user.id)
+
+        return Student.objects.none()

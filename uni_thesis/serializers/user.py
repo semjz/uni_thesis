@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
-from uni_thesis.utils import random_numeric_string
+from uni_thesis.utils import generate_unique_uni_id, generate_email
 from rest_framework.validators import UniqueTogetherValidator
 
 User = get_user_model()
@@ -72,12 +72,11 @@ class UserUpdateSerializer(serializers.ModelSerializer, UserValidationMixin):
         but leave all other model-level validators intact.
         """
         validators = super().get_validators()
-        if getattr(self, 'partial', False):
+        if getattr(self, 'partial', True):
             validators = [
                 v for v in validators
                 if not isinstance(v, UniqueTogetherValidator)
             ]
-            print(validators)
         return validators
 
 
@@ -86,21 +85,3 @@ class UserUpdateSerializer(serializers.ModelSerializer, UserValidationMixin):
             setattr(instance, attr, value)
         instance.save()
         return instance
-
-
-def generate_unique_uni_id(n):
-    return random_numeric_string(n)
-
-def generate_email(validated_data):
-    uni_id = validated_data.get("uni_id")
-    role = validated_data.get("role")
-
-
-    if role == "Student":
-        return f"{uni_id}.student@university.edu"
-
-    elif role == "Professor":
-        return f"{uni_id}.professor@university.edu"
-
-    else:
-        return f"{uni_id}.admin@university.edu"

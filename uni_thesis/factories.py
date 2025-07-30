@@ -30,7 +30,7 @@ class ProfessorFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Professor
 
-    user = factory.SubFactory(UserFactory)
+    user = factory.SubFactory(UserFactory, role="Professor")
     field_of_study = factory.Iterator(["math", "physics", "computer science"])
     specialization = factory.Faker("job")
 
@@ -38,7 +38,7 @@ class StudentFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Student
 
-    user = factory.SubFactory(UserFactory)
+    user = factory.SubFactory(UserFactory, role="Student")
     field_of_study = factory.Iterator(["math", "physics", "computer science"])
     level_of_study = factory.Iterator(["BSc", "MSc", "PhD"])
     specialization = factory.Faker("job")
@@ -47,7 +47,7 @@ class ThesisDefenceRequestFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = ThesisDefenceRequest
 
-    student = factory.SubFactory(StudentFactory)
+    student = factory.SubFactory(StudentFactory, role="Student")
     thesis_title = factory.Faker("sentence", nb_words=4)
     thesis_abstract = factory.Faker("sentence", nb_words=10)
     created_at = factory.Faker("date_this_year")

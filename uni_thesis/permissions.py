@@ -5,25 +5,50 @@ class IsAdminOrOwnStudentOrProfessorReadOnly(BasePermission):
     Allows:
     - Admins full access
     - Professors read-only access to all students
-    - Students access only to their own student object (view/update)
-    - No one except Admins can delete
+    - Students can access only their own object (view/update)
+    - Only Admins can create or delete
     """
+
+    def has_permission(self, request, view):
+        user = request.user
+        method = request.method
+        role = getattr(user, "role", None)
+
+        # Allow Admins everything
+        if user.is_staff or user.is_superuser or role == "Admin":
+            return True
+
+        # Professors: only read allowed
+        if role == "Professor" and method in SAFE_METHODS:
+            return True
+
+        # Students: deny POST
+        if role == "Student" and method == "POST":
+            return False
+
+        # All other users: deny POST/DELETE
+        if method in ['POST', 'DELETE']:
+            return False
+
+        return True
 
     def has_object_permission(self, request, view, obj):
         user = request.user
+        method = request.method
+        role = getattr(user, "role", None)
 
-        # Admins and superusers can do anything
-        if user.is_superuser or user.is_staff or getattr(user, "role", None) == "Admin":
+        # Admins can do anything
+        if user.is_superuser or user.is_staff or role == "Admin":
             return True
 
         # Professors can only read
-        if request.method in SAFE_METHODS and getattr(user, "role", None) == "Professor":
+        if method in SAFE_METHODS and role == "Professor":
             return True
 
-        # Students can only read/update their own object
-        if getattr(user, "role", None) == "Student":
-            if request.method in SAFE_METHODS or request.method in ['PUT', 'PATCH']:
-                return obj.user == user  # assumes Student has OneToOne to User
+        print(role)
+        # Students can read/update their own data
+        if role == "Student" and method in SAFE_METHODS + ('PUT', 'PATCH'):
+            return obj.user == user
 
-        # Deny DELETE for everyone else
+        # Deny everything else
         return False

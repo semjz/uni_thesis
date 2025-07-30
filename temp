@@ -1,0 +1,13 @@
+{"user": {"first_name": "يوسف",
+  "last_name": "نامور",
+  "national_code": "2252215242",
+  "phone_number": "02168619680",
+  "email": "4307908677@university.edu",
+  "gender": "male",
+  "birth_date": "1984-05-25",
+  "password": "StrongPassword123!",
+  "confirm_password": "StrongPassword123!",
+  "role": "Admin"},
+ "field_of_study": "physics",
+ "level_of_study": "MSc",
+ "specialization": "Gaffer"}
