@@ -45,9 +45,39 @@ class IsAdminOrOwnStudentOrProfessorReadOnly(BasePermission):
         if method in SAFE_METHODS and role == "Professor":
             return True
 
-        print(role)
         # Students can read/update their own data
         if role == "Student" and method in SAFE_METHODS + ('PUT', 'PATCH'):
+            return obj.user == user
+
+        # Deny everything else
+        return False
+
+class IsAdminOrOwnProfessorReadOnly(BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        method = request.method
+        role = getattr(user, "role", None)
+
+        if user.is_staff or user.is_superuser or role == "Admin":
+            return True
+
+        if role == "Professor" and method in SAFE_METHODS + ('PUT', 'PATCH'):
+            return True
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+        method = request.method
+        role = getattr(user, "role", None)
+
+        # Admins can do anything
+        if user.is_superuser or user.is_staff or role == "Admin":
+            return True
+
+        # Professors can only read
+        if role == "Professor" and method in SAFE_METHODS + ('PUT', 'PATCH'):
+            print(obj.user == user)
             return obj.user == user
 
         # Deny everything else

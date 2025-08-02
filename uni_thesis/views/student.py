@@ -1,9 +1,11 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework.viewsets import ModelViewSet
 from uni_thesis.models import Student
 from uni_thesis.serializers import StudentCreateSerializer, StudentUpdateSerializer
 from uni_thesis.permissions import IsAdminOrOwnStudentOrProfessorReadOnly
 from rest_framework.permissions import IsAuthenticated
 
+@extend_schema(tags=["Students"])
 class StudentViewSet(ModelViewSet):
     queryset = Student.objects.all()
     permission_classes = [IsAuthenticated, IsAdminOrOwnStudentOrProfessorReadOnly]

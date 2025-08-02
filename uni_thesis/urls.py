@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import StudentViewSet
+from .views import StudentViewSet, ProfessorViewSet
 
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -9,6 +9,7 @@ from rest_framework_simplejwt.views import (
 
 router = DefaultRouter()
 router.register('students', StudentViewSet, basename='student')
+router.register('professors', ProfessorViewSet, basename='professor')
 
 app_name = 'uni_thesis'
 
