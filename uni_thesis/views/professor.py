@@ -1,18 +1,17 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework.viewsets import ModelViewSet
 from uni_thesis.models import Professor
-from uni_thesis.serializers import ProfessorCreateSerializer, ProfessorUpdateSerializer
+from uni_thesis.serializers import ProfessorUpdateSerializer
 from uni_thesis.permissions import IsAdminOrOwnProfessorReadOnly
 from rest_framework.permissions import IsAuthenticated
 
 @extend_schema(tags=["Professors"])
 class ProfessorViewSet(ModelViewSet):
+    http_method_names = ['get', 'put', 'patch', 'head', 'options']
     permission_classes = [IsAuthenticated, IsAdminOrOwnProfessorReadOnly]
     lookup_field = 'pk'
 
     def get_serializer_class(self, *args, **kwargs):
-        if self.action == 'create':
-            return ProfessorCreateSerializer
         return ProfessorUpdateSerializer
 
     def get_queryset(self):

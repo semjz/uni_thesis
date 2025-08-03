@@ -1,3 +1,3 @@
 from .user import UserCreateSerializer, UserUpdateSerializer
-from .student import StudentCreateSerializer, StudentUpdateSerializer
-from .professor import ProfessorCreateSerializer, ProfessorUpdateSerializer
+from .student import  StudentUpdateSerializer
+from .professor import  ProfessorUpdateSerializer

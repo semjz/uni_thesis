@@ -47,7 +47,7 @@ class ThesisDefenceRequestFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = ThesisDefenceRequest
 
-    student = factory.SubFactory(StudentFactory, role="Student")
+    student = factory.SubFactory(StudentFactory)
     thesis_title = factory.Faker("sentence", nb_words=4)
     thesis_abstract = factory.Faker("sentence", nb_words=10)
     created_at = factory.Faker("date_this_year")

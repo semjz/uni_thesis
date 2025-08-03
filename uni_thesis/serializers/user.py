@@ -29,6 +29,7 @@ class UserCreateSerializer(serializers.ModelSerializer, UserValidationMixin):
     class Meta:
         model = User
         fields = [
+            "id",
             "uni_id",
             "password",
             "confirm_password",
@@ -36,12 +37,14 @@ class UserCreateSerializer(serializers.ModelSerializer, UserValidationMixin):
             "last_name",
             "phone_number",
             "national_code",
-            "birth_date"
+            "birth_date",
+            "gender",
+            "role"
         ]
         extra_kwargs = {
             "password": {"write_only": True}
         }
-        read_only_fields = ["uni_id", "email"]
+        read_only_fields = ["uni_id", "email", "id"]
 
     def validate(self, data):
         if data["password"] != data["confirm_password"]:
@@ -63,7 +66,7 @@ class UserUpdateSerializer(serializers.ModelSerializer, UserValidationMixin):
             "last_name",
             "phone_number",
             "national_code",
-            "birth_date"
+            "birth_date",
         ]
 
     def get_validators(self):

@@ -27,11 +27,6 @@ class StudentAPITestCase(APITestCase):
         }
         self.student = StudentFactory.create()
 
-    def test_create_student_forbidden(self):
-        self.url = reverse_lazy("uni_thesis:student-list")
-        self.client.force_authenticate(self.student.user)
-        response = self.client.post(self.url, self.student_user_data, format="json")
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_update_student_successful(self):
         self.url = reverse_lazy("uni_thesis:student-detail", kwargs={"pk": self.student.pk})

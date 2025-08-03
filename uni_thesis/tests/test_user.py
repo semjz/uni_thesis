@@ -1,8 +1,10 @@
 from django.test import TestCase
-from uni_thesis.serializers import UserCreateSerializer
+from rest_framework import status
+from rest_framework.reverse import reverse_lazy
+
 from uni_thesis.factories import UserFactory
 
-class CreateUserSerializerTests(TestCase):
+class RegisterTests(TestCase):
 
     def setUp(self):
         self.base_user = UserFactory.build()
@@ -18,34 +20,33 @@ class CreateUserSerializerTests(TestCase):
         "confirm_password": self.base_user.password,
         "role": self.base_user.role,
     }
+        self.url = reverse_lazy("uni_thesis:register")
 
-    def test_valid_data_creates_user(self):
-        serializer = UserCreateSerializer(data=self.user_data)
-        self.assertTrue(serializer.is_valid())
-        user = serializer.save()
-        self.assertTrue(user.check_password(self.user_data["password"]))
+    def test_valid_data_register_user(self):
+        response = self.client.post(self.url, self.user_data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_password_short(self):
         self.user_data["password"] = "12345"
         self.user_data["confirm_password"] = "12345"
-        serializer = UserCreateSerializer(data=self.user_data)
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("password", serializer.errors)
+        response = self.client.post(self.url, self.user_data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("password", response.data)
 
     def test_password_mismatch(self):
         self.user_data["confirm_password"] = "<PASSWORD>1"
-        serializer = UserCreateSerializer(data=self.user_data)
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("Passwords must match!", serializer.errors["non_field_errors"])
+        response = self.client.post(self.url, self.user_data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("confirm_password", response.data)
 
     def test_invalid_national_code(self):
-        self.user_data["national_code"] = "123456"
-        serializer = UserCreateSerializer(data=self.user_data)
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("national_code", serializer.errors)
+        self.user_data["national_code"] = "xxxxxxxxxx"
+        response = self.client.post(self.url, self.user_data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("national_code", response.data)
 
     def test_invalid_phone_number(self):
-        self.user_data["phone_number"] = "123456"
-        serializer = UserCreateSerializer(data=self.user_data)
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("phone_number", serializer.errors)
+        self.user_data["phone_number"] = "xxxxxxxxxxxx"
+        response = self.client.post(self.url, self.user_data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("phone_number", response.data)

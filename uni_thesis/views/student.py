@@ -1,19 +1,18 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework.viewsets import ModelViewSet
 from uni_thesis.models import Student
-from uni_thesis.serializers import StudentCreateSerializer, StudentUpdateSerializer
+from uni_thesis.serializers import StudentUpdateSerializer
 from uni_thesis.permissions import IsAdminOrOwnStudentOrProfessorReadOnly
 from rest_framework.permissions import IsAuthenticated
 
 @extend_schema(tags=["Students"])
 class StudentViewSet(ModelViewSet):
+    http_method_names = ['get', 'put', 'patch', 'head', 'options']
     queryset = Student.objects.all()
     permission_classes = [IsAuthenticated, IsAdminOrOwnStudentOrProfessorReadOnly]
     lookup_field = 'pk'
 
     def get_serializer_class(self, *args, **kwargs):
-        if self.action == 'create':
-            return StudentCreateSerializer
         return StudentUpdateSerializer
 
     def get_queryset(self):

@@ -26,11 +26,6 @@ class ProfessorAPITestCase(APITestCase):
         }
         self.professor = ProfessorFactory.create()
 
-    def test_create_professor_forbidden(self):
-        self.url = reverse_lazy("uni_thesis:professor-list")
-        self.client.force_authenticate(self.professor.user)
-        response = self.client.post(self.url, self.professor_user_data, format="json")
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_update_professor_successful(self):
         self.url = reverse_lazy("uni_thesis:professor-detail", kwargs={"pk": self.professor.pk})
