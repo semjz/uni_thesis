@@ -1,24 +1,30 @@
 from django.db import models
-from django.core.exceptions import ValidationError
+from django.db.models import Q, F
+
 from .accounts import Professor, Student
 
 
 class TimeSlot(models.Model):
-    professor = models.ForeignKey(Professor, on_delete=models.CASCADE)
-    date = models.DateField()
+    professor  = models.ForeignKey(Professor, on_delete=models.CASCADE, related_name="time_slots")
+    date       = models.DateField()
     start_time = models.TimeField()
-    end_time = models.TimeField()
-    selected = models.BooleanField(default=False)
+    end_time   = models.TimeField()
+    available  = models.BooleanField(default=True)  # True=offered, False=booked/unavailable
 
     class Meta:
-        unique_together = ("professor", "date", "start_time")
-
-    def clean(self):
-        if self.start_time > self.end_time:
-            raise ValidationError("Start time must be before end time")
+        constraints = [
+            models.CheckConstraint(check=Q(end_time__gt=F("start_time")),
+                                   name="timeslot_end_after_start"),
+            models.UniqueConstraint(fields=["professor", "date", "start_time"],
+                                    name="uniq_prof_date_start_end"),
+        ]
+        indexes = [
+            models.Index(fields=["professor", "date", "start_time"]),
+            models.Index(fields=["professor", "available", "date", "start_time"]),
+        ]
 
     def __str__(self):
-        return f"{self.professor} - {self.date} {self.start_time} {self.end_time}"
+        return f"{self.professor.id} | {self.start_at}–{self.end_at}"
 
 class ThesisDefenceRequest(models.Model):
     STATUS_CHOICES = [
@@ -58,7 +64,19 @@ class DefenceSession(models.Model):
     observer = models.ForeignKey(Professor, on_delete=models.CASCADE, related_name="observer_sessions")
     date = models.DateField()
     start_time = models.TimeField()
+    end_time = models.TimeField()
     location = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(check=Q(end_time__gt=F("start_time")),
+                                   name="session_end_after_start"),
+            models.CheckConstraint(check=~Q(evaluator=F("observer")),
+                                   name="evaluator_and_observer_must_differ"),
+        ]
+        indexes = [models.Index(fields=["date", "start_time"])]
 
     def __str__(self):
         return f"Defence for {self.request} on {self.date} at {self.location}"

@@ -23,12 +23,14 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
 )
 
+from uni_thesis.views.thesis_defence import CreateThesisDefenceRequestView
+
 urlpatterns = [
     #    path('admin/', admin.site.urls),
-    path('api/', include('uni_thesis.urls', namespace="uni_thesis")),
-    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path("api/", include("uni_thesis.urls", namespace="uni_thesis")),
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     # Swagger UI
-    path('api/docs/swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path("api/docs/swagger/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
     # ReDoc UI
-    path('api/docs/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    path("api/docs/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
 ]

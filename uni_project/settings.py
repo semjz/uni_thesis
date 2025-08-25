@@ -93,6 +93,20 @@ DATABASES = {
     }
 }
 
+# caching
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/1",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
+
+CACHE_TTL = 60 * 5
+
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -150,3 +164,11 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'uni_thesis.User'
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+MAILERSEND_API_KEY = 'mlsn.21b05116480beddab4b6f12c1c1f9f29ea977f37df8584662b6399d630b505e6'
+EMAIL_USE_TLS = True
+EMAIL_HOST = "https://api.mailersend.com/v1/email"
+EMAIL_HOST_USER = "MS_EbWb6P@test-68zxl27zop34j905.mlsender.net"
+EMAIL_HOST_PASSWORD = "mssp.feDYGYH.0p7kx4xew2mg9yjr.FrZNlVp"
+EMAIL_PORT = 587

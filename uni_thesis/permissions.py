@@ -1,4 +1,6 @@
 from rest_framework.permissions import BasePermission, SAFE_METHODS
+from uni_thesis.models import Professor, Student
+
 
 class IsAdminOrOwnStudentOrProfessorReadOnly(BasePermission):
     """
@@ -77,8 +79,54 @@ class IsAdminOrOwnProfessorReadOnly(BasePermission):
 
         # Professors can only read
         if role == "Professor" and method in SAFE_METHODS + ('PUT', 'PATCH'):
-            print(obj.user == user)
             return obj.user == user
 
         # Deny everything else
         return False
+
+
+
+class IsProfessorUserOrAdmin(BasePermission):
+    """
+    User must be authenticated and be a Professor (or Admin).
+    """
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        # Admins pass
+        if user.is_staff or getattr(user, "role", None) == "Admin":
+            return True
+        # Professors pass if they have a Professor record
+        return Professor.objects.filter(user_id=user.id).exists()
+
+class IsStudentUserOrAdmin(BasePermission):
+    """
+    User must be authenticated and be a Student (or Admin).
+    """
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        # Admins pass
+        if user.is_staff or getattr(user, "role", None) == "Admin":
+            return True
+        # Professors pass if they have a Student record
+        return Student.objects.filter(user_id=user.id).exists()
+
+
+class IsTimeslotOwnerOrAdmin(BasePermission):
+    """
+    Object-level: allow staff; otherwise only the professor who owns the TimeSlot.
+    """
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+        if user.is_staff or getattr(user, "role", None) == "Admin":
+            return True
+        # TimeSlot has FK to Professor; compare to the current user's professor
+        try:
+            my_prof_id = Professor.objects.only("id").get(user_id=user.id).id
+        except Professor.DoesNotExist:
+            return False
+        return getattr(obj, "professor_id", None) == my_prof_id
+

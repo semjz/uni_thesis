@@ -1,3 +1,3 @@
 from .student import StudentViewSet
 from .professor import ProfessorViewSet
-from .register import RegisterAPIView
+from .auth import RegisterAPIView, PasswordResetAction, PasswordResetRequest

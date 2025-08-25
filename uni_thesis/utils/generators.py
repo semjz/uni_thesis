@@ -2,7 +2,7 @@ import secrets
 import string
 
 def random_numeric_string(n):
-    return ''.join(secrets.choice(string.digits) for _ in range(n))
+    return "".join(secrets.choice(string.digits) for _ in range(n))
 
 def generate_unique_uni_id(n):
     return random_numeric_string(n)

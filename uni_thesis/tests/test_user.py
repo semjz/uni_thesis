@@ -9,6 +9,7 @@ class RegisterTests(TestCase):
     def setUp(self):
         self.base_user = UserFactory.build()
         self.user_data = {
+        "uni_id": self.base_user.uni_id,
         "first_name": self.base_user.first_name,
         "last_name": self.base_user.last_name,
         "national_code": self.base_user.national_code,

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
-from uni_thesis.utils import generate_unique_uni_id, generate_email
+from uni_thesis.utils import generate_email
 from rest_framework.validators import UniqueTogetherValidator
 
 User = get_user_model()
@@ -39,12 +39,12 @@ class UserCreateSerializer(serializers.ModelSerializer, UserValidationMixin):
             "national_code",
             "birth_date",
             "gender",
-            "role"
+            "role",
         ]
         extra_kwargs = {
             "password": {"write_only": True}
         }
-        read_only_fields = ["uni_id", "email", "id"]
+        read_only_fields = ["id"]
 
     def validate(self, data):
         if data["password"] != data["confirm_password"]:
@@ -53,7 +53,6 @@ class UserCreateSerializer(serializers.ModelSerializer, UserValidationMixin):
 
     def create(self, validated_data):
         validated_data.pop("confirm_password")
-        validated_data["uni_id"] = generate_unique_uni_id(10)
         validated_data["email"] = generate_email(validated_data)
         return User.objects.create_user(**validated_data)
 
@@ -67,7 +66,9 @@ class UserUpdateSerializer(serializers.ModelSerializer, UserValidationMixin):
             "phone_number",
             "national_code",
             "birth_date",
+            "email"
         ]
+
 
     def get_validators(self):
         """

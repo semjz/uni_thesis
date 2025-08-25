@@ -1,6 +1,5 @@
 # serializers/student.py
-from .user import UserCreateSerializer, UserUpdateSerializer
-from .base import BaseUserModelCreateSerializer
+from .user import UserUpdateSerializer
 from .base import BaseUserModelUpdateSerializer
 from uni_thesis.models import Student
 
@@ -9,5 +8,5 @@ class StudentUpdateSerializer(BaseUserModelUpdateSerializer):
 
     class Meta:
         model = Student
-        fields = ["user", "field_of_study", "level_of_study", "specialization"]
+        fields = ["user", "id", "field_of_study", "level_of_study", "specialization"]
         extra_kwargs = {f: {"required": False} for f in fields}
