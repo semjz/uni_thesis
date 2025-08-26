@@ -43,7 +43,7 @@ class RegisterAPIView(CreateAPIView):
             "user": user_data,
         }, status=status.HTTP_201_CREATED)
 
-@extend_schema(tags=["Authentication"])
+@extend_schema(tags=["authentication"])
 class PasswordResetRequest(GenericAPIView):
     permission_classes = (AllowAny,)
     serializer_class = ChangePasswordRequestSerializer
@@ -77,7 +77,7 @@ class PasswordResetRequest(GenericAPIView):
             return Response(error_message, status=status.HTTP_400_BAD_REQUEST)
 
 
-@extend_schema(tags=["Authentication"])
+@extend_schema(tags=["authentication"])
 class PasswordResetAction(GenericAPIView):
     permission_classes = (AllowAny,)
     serializer_class = ChangePasswordActionSerializer

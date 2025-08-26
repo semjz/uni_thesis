@@ -20,14 +20,14 @@ app_name = 'uni_thesis'
 # Apply schema metadata to POST method
 decorated_token_view = extend_schema_view(
     post=extend_schema(
-        tags=["Authentication"],
+        tags=["authentication"],
         description="Obtain JWT access and refresh tokens."
     )
 )(TokenObtainPairView)
 
 decorated_token_refresh_view = extend_schema_view(
     post=extend_schema(
-        tags=["Authentication"],
+        tags=["authentication"],
         description="Refresh your JWT access token using a refresh token."
     )
 )(TokenRefreshView)
