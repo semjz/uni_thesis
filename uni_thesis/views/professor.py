@@ -5,7 +5,7 @@ from uni_thesis.serializers import ProfessorUpdateSerializer
 from uni_thesis.permissions import IsAdminOrOwnProfessorReadOnly
 from rest_framework.permissions import IsAuthenticated
 
-@extend_schema(tags=["Professors"])
+@extend_schema(tags=["professors"])
 class ProfessorViewSet(ModelViewSet):
     http_method_names = ['get', 'put', 'patch', 'head', 'options']
     permission_classes = [IsAuthenticated, IsAdminOrOwnProfessorReadOnly]

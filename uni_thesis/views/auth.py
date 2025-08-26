@@ -16,7 +16,7 @@ from uni_thesis.serializers import UserCreateSerializer
 from uni_thesis.serializers.auth import ChangePasswordRequestSerializer, ChangePasswordActionSerializer
 
 
-@extend_schema(tags=["Authentication"])
+@extend_schema(tags=["authentication"])
 class RegisterAPIView(CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserCreateSerializer

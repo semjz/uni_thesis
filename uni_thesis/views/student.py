@@ -5,7 +5,7 @@ from uni_thesis.serializers import StudentUpdateSerializer
 from uni_thesis.permissions import IsAdminOrOwnStudentOrProfessorReadOnly
 from rest_framework.permissions import IsAuthenticated
 
-@extend_schema(tags=["Students"])
+@extend_schema(tags=["students"])
 class StudentViewSet(ModelViewSet):
     http_method_names = ['get', 'put', 'patch', 'head', 'options']
     queryset = Student.objects.all()
