@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework.generics import get_object_or_404
 from rest_framework.views import APIView
 
@@ -31,7 +32,7 @@ def overlaps_for_prof(professor_id, date, start_time, end_time, exclude_pk=None)
         qs = qs.exclude(pk=exclude_pk)
     return qs.exists()
 
-
+@extend_schema(tags=["time-slot"])
 class MyTimeSlotListCreateView(generics.ListCreateAPIView):
     """
     GET  /api/timeslots/   -> list *my* slots (scoped queryset => privacy-friendly 404s elsewhere)
@@ -86,7 +87,7 @@ class MyTimeSlotListCreateView(generics.ListCreateAPIView):
 
         return Response(TimeSlotSerializer(created, many=True).data, status=status.HTTP_201_CREATED)
 
-
+@extend_schema(tags=["time-slot"])
 class MyTimeSlotDeleteView(generics.DestroyAPIView):
     """
     DELETE /api/timeslots/<int:pk>/
@@ -99,7 +100,7 @@ class MyTimeSlotDeleteView(generics.DestroyAPIView):
         prof = me_prof(self.request.user)
         return TimeSlot.objects.filter(professor=prof)
 
-
+@extend_schema(tags=["time-slot"])
 class CreateThesisDefenceRequestView(APIView):
     permission_classes = [IsAuthenticated, IsStudentUserOrAdmin]
     def post(self, request, student_id):
