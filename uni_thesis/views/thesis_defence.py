@@ -100,7 +100,6 @@ class MyTimeSlotDeleteView(generics.DestroyAPIView):
         prof = me_prof(self.request.user)
         return TimeSlot.objects.filter(professor=prof)
 
-@extend_schema(tags=["time-slot"])
 class CreateThesisDefenceRequestView(APIView):
     permission_classes = [IsAuthenticated, IsStudentUserOrAdmin]
     def post(self, request, student_id):
