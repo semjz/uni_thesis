@@ -1,15 +1,17 @@
 from django.urls import path, include
 from drf_spectacular.utils import extend_schema_view, extend_schema
 from rest_framework.routers import DefaultRouter
-from .views import StudentViewSet, ProfessorViewSet, RegisterAPIView, PasswordResetRequest, PasswordResetAction
+from .views import (StudentViewSet, ProfessorViewSet, RegisterAPIView, PasswordResetRequest,
+                    PasswordResetAction, CreateThesisDefenceRequestView, MyTimeSlotListCreateView,
+                    MyTimeSlotDeleteView, StudentThesisDefenceRequestView, DefenceSessionListView,
+                    DefenceSessionDetailAdminView)
 
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
 
-from .views.thesis_defence import CreateThesisDefenceRequestView, MyTimeSlotListCreateView, MyTimeSlotDeleteView, \
-    StudentThesisDefenceRequestView
+
 
 router = DefaultRouter()
 router.register('students', StudentViewSet, basename='student')
@@ -50,4 +52,7 @@ urlpatterns = [
     path("students/<int:student_id>/thesis-defence-request/",StudentThesisDefenceRequestView.as_view() ,name="student-thesis-defence-request"),
 
    path("defence-request/<int:student_id>/create/", CreateThesisDefenceRequestView.as_view(), name="thesis-defence-create"),
+
+    path("defence-sessions/", DefenceSessionListView.as_view(), name="defence-session-list"),
+    path("defence-sessions/<int:pk>/", DefenceSessionDetailAdminView.as_view(), name="defence-session-detail"),
 ]

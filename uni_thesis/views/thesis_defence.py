@@ -1,16 +1,18 @@
+from django.db.models import Q
 from rest_framework.generics import get_object_or_404
 from rest_framework.views import APIView
-from rest_framework import generics, status
+from rest_framework import generics, status, serializers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
-from uni_thesis.models import Student, Professor, TimeSlot, ThesisDefenceRequest
+from uni_thesis.models import Student, Professor, TimeSlot, ThesisDefenceRequest, DefenceSession
 from uni_thesis.permissions import IsProfessorUserOrAdmin, IsTimeslotOwnerOrAdmin, IsStudentUserOrAdmin, IsAdmin
 from uni_thesis.serializers import TimeSlotInSerializer, TimeSlotSerializer, ThesisDefenceRequestSerializer, \
     DefenceSessionCreateSerializer, DefenceSessionSerializer
 from AI.candidates import suggest_committee_for_request
+from django.utils.dateparse import parse_date, parse_time
 
 
 def me_prof(user) -> Professor:
@@ -98,10 +100,10 @@ class MyTimeSlotDeleteView(generics.DestroyAPIView):
 
 
 class CreateThesisDefenceRequestView(APIView):
-    permission_classes = [IsAuthenticated]  # keep your custom permission if needed
+    permission_classes = [IsAuthenticated, IsStudentUserOrAdmin]
 
     def post(self, request, student_id: int):
-        # 0) validate student & single request rule (outside tx)
+        # 0) student + single request check
         try:
             student = Student.objects.get(id=student_id)
         except Student.DoesNotExist:
@@ -109,54 +111,56 @@ class CreateThesisDefenceRequestView(APIView):
         if ThesisDefenceRequest.objects.filter(student=student).exists():
             return Response({"error": "This student already submitted a request."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 1) validate request payload (outside tx)
+        # 1) validate payload
         req_ser = ThesisDefenceRequestSerializer(data=request.data, context={"student": student})
         if not req_ser.is_valid():
             return Response(req_ser.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        # 2) get AI suggestion (outside tx to avoid long transactions)
+        # 2) get & validate AI suggestion (OUTSIDE tx)
         supervisor_id = request.data.get("supervisor_id")
-        suggestion = suggest_committee_for_request(  # may be instant or a bit slow
-            req_ser.initial_data,  # you can pass the req object later; this is just to keep it outside tx if needed
-            supervisor_id=supervisor_id
-        )  # if your helper needs the saved request instance, move this below; otherwise keep here
+        suggestion = suggest_committee_for_request(req_ser.initial_data, supervisor_id=supervisor_id)
 
-        # If your suggestor requires the saved DB request, compute suggestion just after saving (see note below).
+        if suggestion.get("status") not in {"success", "model_unavailable"}:
+            return Response(
+                {"error": "Automatic scheduling failed.",
+                 "reason": suggestion.get("message", suggestion.get("status"))},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        data = suggestion.get("data") or {}
+        slot_key = data.get("suggested_time")
+        d, t1, t2 = _parse_slot_key(slot_key) if slot_key else (None, None, None)
+        if not (data.get("evaluator_id") and data.get("observer_id") and d and t1 and t2):
+            return Response(
+                {"error": "Automatic scheduling failed (no concrete slot).",
+                 "suggestion": suggestion},
+                status=status.HTTP_409_CONFLICT,
+            )
 
         # 3) atomic: create request + book session
-        with transaction.atomic():
-            req = req_ser.save()  # OneToOne enforces single request
+        try:
+            with transaction.atomic():
+                req = req_ser.save()
 
-            # If your suggestor **requires** the saved request object, compute it here instead:
-            # suggestion = suggest_committee_for_request(req, supervisor_id=supervisor_id)
+                ds_in = {
+                    "request": req.pk,
+                    "evaluator": data["evaluator_id"],
+                    "observer": data["observer_id"],
+                    "date": d,
+                    "start_time": t1,
+                    "end_time": t2,
+                    "location": "Seminar Room A",
+                }
+                ds_ser = DefenceSessionCreateSerializer(data=ds_in)
+                ds_ser.is_valid(raise_exception=True)  # may raise ValidationError
+                session = ds_ser.save()
 
-            if suggestion.get("status") not in {"success", "model_unavailable"}:
-                return Response(
-                    {"error": "Automatic scheduling failed.", "reason": suggestion.get("message", suggestion["status"])},
-                    status=status.HTTP_409_CONFLICT,
-                )
-
-            data = suggestion.get("data") or {}
-            slot_key = data.get("suggested_time")
-            d, t1, t2 = _parse_slot_key(slot_key) if slot_key else (None, None, None)
-            if not (data.get("evaluator_id") and data.get("observer_id") and d and t1 and t2):
-                return Response(
-                    {"error": "Automatic scheduling failed (no concrete slot).", "suggestion": suggestion},
-                    status=status.HTTP_409_CONFLICT,
-                )
-
-            ds_in = {
-                "request": req.pk,
-                "evaluator": data["evaluator_id"],
-                "observer": data["observer_id"],
-                "date": d,
-                "start_time": t1,
-                "end_time": t2,
-                "location": "Seminar Room A",
-            }
-            ds_ser = DefenceSessionCreateSerializer(data=ds_in)
-            ds_ser.is_valid(raise_exception=True)  # if this fails, the transaction rolls back
-            session = ds_ser.save()
+        except serializers.ValidationError as e:
+            # Booking failed (e.g., slots not available) → no request left behind
+            return Response(
+                {"error": "Automatic scheduling failed.", "booking_errors": e.detail},
+                status=status.HTTP_409_CONFLICT,
+            )
 
         # 4) success
         return Response(
@@ -192,3 +196,49 @@ def _parse_slot_key(slot_key: str):
         return parse_date(d), parse_time(s), parse_time(e)
     except Exception:
         return None, None, None
+
+
+def _base_qs():
+    return (
+        DefenceSession.objects
+        .select_related("request", "evaluator", "observer", "request__student", "request__student__user")
+        .order_by("date", "start_time")
+    )
+
+
+class DefenceSessionListView(generics.ListAPIView):
+    """
+    GET /defence-sessions/
+    - Admin: all sessions
+    - Professor: sessions where they are evaluator OR observer
+    - Student: session for their own request
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = DefenceSessionSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = _base_qs()
+
+        if user.is_staff:
+            return qs
+
+        prof = Professor.objects.filter(user_id=user.id).first()
+        if prof:
+            return qs.filter(Q(evaluator=prof) | Q(observer=prof))
+
+        student = Student.objects.filter(user_id=user.id).first()
+        if student:
+            return qs.filter(request__student=student)
+
+        return qs.none()
+
+
+class DefenceSessionDetailAdminView(generics.RetrieveAPIView):
+    """
+    GET /defence-sessions/<pk>/ (ADMIN ONLY)
+    """
+    permission_classes = [IsAuthenticated, IsAdmin]
+    serializer_class = DefenceSessionSerializer
+    queryset = _base_qs()
+    lookup_field = "pk"

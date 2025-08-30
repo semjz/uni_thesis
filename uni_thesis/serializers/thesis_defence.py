@@ -234,3 +234,4 @@ class DefenceSessionCreateSerializer(serializers.Serializer):
                 req.save(update_fields=["status", "updated_at"])
 
             return session
+
