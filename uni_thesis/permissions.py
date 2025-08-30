@@ -130,3 +130,9 @@ class IsTimeslotOwnerOrAdmin(BasePermission):
             return False
         return getattr(obj, "professor_id", None) == my_prof_id
 
+class IsAdmin(BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        return user.is_staff or getattr(user, "role", None) == "Admin"
+
+

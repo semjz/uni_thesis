@@ -1,20 +1,16 @@
-from drf_spectacular.utils import extend_schema
 from rest_framework.generics import get_object_or_404
 from rest_framework.views import APIView
-
-from uni_thesis.models import Student, ThesisDefenceRequest
-from uni_thesis.permissions import IsProfessorUserOrAdmin, IsTimeslotOwnerOrAdmin, IsStudentUserOrAdmin
-from uni_thesis.serializers.thesis_defence import ThesisDefenceRequestSerializer
-
-from django.db import transaction
-from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-
-from uni_thesis.models import Professor
-from uni_thesis.models import TimeSlot
-from uni_thesis.serializers import TimeSlotInSerializer, TimeSlotSerializer
+from django.db import transaction
+from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import extend_schema
+from uni_thesis.models import Student, Professor, TimeSlot, ThesisDefenceRequest
+from uni_thesis.permissions import IsProfessorUserOrAdmin, IsTimeslotOwnerOrAdmin, IsStudentUserOrAdmin, IsAdmin
+from uni_thesis.serializers import TimeSlotInSerializer, TimeSlotSerializer, ThesisDefenceRequestSerializer, \
+    DefenceSessionCreateSerializer, DefenceSessionSerializer
+from AI.candidates import suggest_committee_for_request
 
 
 def me_prof(user) -> Professor:
@@ -100,28 +96,77 @@ class MyTimeSlotDeleteView(generics.DestroyAPIView):
         prof = me_prof(self.request.user)
         return TimeSlot.objects.filter(professor=prof)
 
+
 class CreateThesisDefenceRequestView(APIView):
-    permission_classes = [IsAuthenticated, IsStudentUserOrAdmin]
-    def post(self, request, student_id):
-        # 1. check student exists
+    permission_classes = [IsAuthenticated]  # keep your custom permission if needed
+
+    def post(self, request, student_id: int):
+        # 0) validate student & single request rule (outside tx)
         try:
             student = Student.objects.get(id=student_id)
         except Student.DoesNotExist:
             return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        # 2. ensure student has only ONE request
         if ThesisDefenceRequest.objects.filter(student=student).exists():
-            return Response(
-                {"error": "This student already submitted a request."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "This student already submitted a request."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 3. validate and save
-        serializer = ThesisDefenceRequestSerializer(data=request.data,  context={"student": student})
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        # 1) validate request payload (outside tx)
+        req_ser = ThesisDefenceRequestSerializer(data=request.data, context={"student": student})
+        if not req_ser.is_valid():
+            return Response(req_ser.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # 2) get AI suggestion (outside tx to avoid long transactions)
+        supervisor_id = request.data.get("supervisor_id")
+        suggestion = suggest_committee_for_request(  # may be instant or a bit slow
+            req_ser.initial_data,  # you can pass the req object later; this is just to keep it outside tx if needed
+            supervisor_id=supervisor_id
+        )  # if your helper needs the saved request instance, move this below; otherwise keep here
+
+        # If your suggestor requires the saved DB request, compute suggestion just after saving (see note below).
+
+        # 3) atomic: create request + book session
+        with transaction.atomic():
+            req = req_ser.save()  # OneToOne enforces single request
+
+            # If your suggestor **requires** the saved request object, compute it here instead:
+            # suggestion = suggest_committee_for_request(req, supervisor_id=supervisor_id)
+
+            if suggestion.get("status") not in {"success", "model_unavailable"}:
+                return Response(
+                    {"error": "Automatic scheduling failed.", "reason": suggestion.get("message", suggestion["status"])},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            data = suggestion.get("data") or {}
+            slot_key = data.get("suggested_time")
+            d, t1, t2 = _parse_slot_key(slot_key) if slot_key else (None, None, None)
+            if not (data.get("evaluator_id") and data.get("observer_id") and d and t1 and t2):
+                return Response(
+                    {"error": "Automatic scheduling failed (no concrete slot).", "suggestion": suggestion},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            ds_in = {
+                "request": req.pk,
+                "evaluator": data["evaluator_id"],
+                "observer": data["observer_id"],
+                "date": d,
+                "start_time": t1,
+                "end_time": t2,
+                "location": "Seminar Room A",
+            }
+            ds_ser = DefenceSessionCreateSerializer(data=ds_in)
+            ds_ser.is_valid(raise_exception=True)  # if this fails, the transaction rolls back
+            session = ds_ser.save()
+
+        # 4) success
+        return Response(
+            {
+                "request": ThesisDefenceRequestSerializer(req).data,
+                "defence_session": DefenceSessionSerializer(session).data,
+                "suggestion": suggestion,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 class StudentThesisDefenceRequestView(generics.RetrieveAPIView):
     """
@@ -138,3 +183,12 @@ class StudentThesisDefenceRequestView(generics.RetrieveAPIView):
         if user.is_staff:
             return qs
         return qs.filter(student__user_id=user.id)
+
+
+def _parse_slot_key(slot_key: str):
+    try:
+        d, times = slot_key.split("|", 1)
+        s, e = times.split("-", 1)
+        return parse_date(d), parse_time(s), parse_time(e)
+    except Exception:
+        return None, None, None

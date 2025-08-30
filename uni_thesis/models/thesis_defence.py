@@ -5,11 +5,11 @@ from .accounts import Professor, Student
 
 
 class TimeSlot(models.Model):
-    professor  = models.ForeignKey(Professor, on_delete=models.CASCADE, related_name="time_slots")
-    date       = models.DateField()
+    professor = models.ForeignKey(Professor, on_delete=models.CASCADE, related_name="time_slots")
+    date = models.DateField()
     start_time = models.TimeField()
-    end_time   = models.TimeField()
-    available  = models.BooleanField(default=True)  # True=offered, False=booked/unavailable
+    end_time = models.TimeField()
+    available = models.BooleanField(default=True)  # True=offered, False=booked/unavailable
 
     class Meta:
         constraints = [

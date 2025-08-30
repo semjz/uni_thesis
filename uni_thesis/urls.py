@@ -42,10 +42,10 @@ urlpatterns = [
     path('token/refresh/', decorated_token_refresh_view.as_view(), name="refresh"),
 
     # GET/POST  /api/timeslots/
-    path("api/timeslots/", MyTimeSlotListCreateView.as_view(), name="timeslot-list-create"),
+    path("timeslots/", MyTimeSlotListCreateView.as_view(), name="timeslot-list-create"),
 
     # DELETE    /api/timeslots/<pk>/
-    path("api/timeslots/<int:pk>/", MyTimeSlotDeleteView.as_view(), name="timeslot-delete"),
+    path("timeslots/<int:pk>/", MyTimeSlotDeleteView.as_view(), name="timeslot-delete"),
 
     path("students/<int:student_id>/thesis-defence-request/",StudentThesisDefenceRequestView.as_view() ,name="student-thesis-defence-request"),
 
