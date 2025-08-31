@@ -29,13 +29,9 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))  # Load from .env file
 SECRET_KEY = env("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env.bool("DEBUG", False)
-ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
-CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=["http://localhost","http://127.0.0.1"])
-SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", True)
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+DEBUG = True
+
+ALLOWED_HOSTS = []
 
 
 # Application definition
@@ -54,7 +50,6 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -87,33 +82,23 @@ WSGI_APPLICATION = 'uni_project.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-import dj_database_url
-if env("DATABASE_URL", default=None):
-    DATABASES = {
-        "default": dj_database_url.parse(
-            env("DATABASE_URL"),
-            conn_max_age=600,
-            ssl_require=True,
-        )
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': env('POSTGRES_NAME'),
+        'USER': env('POSTGRES_USER'),
+        'PASSWORD': env('POSTGRES_PASSWORD'),
+        'HOST': env('POSTGRES_HOST'),
+        'PORT': env('POSTGRES_PORT'),
     }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': env('POSTGRES_NAME'),
-            'USER': env('POSTGRES_USER'),
-            'PASSWORD': env('POSTGRES_PASSWORD'),
-            'HOST': env('POSTGRES_HOST'),
-            'PORT': env('POSTGRES_PORT'),
-        }
-    }
+}
 
 # caching
 
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": env("REDIS_URL", default="redis://localhost:6379/1"),
+        "LOCATION": "redis://127.0.0.1:6379/1",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         }
@@ -121,11 +106,6 @@ CACHES = {
 }
 
 CACHE_TTL = 60 * 5
-
-
-LOGGING = {"version": 1, "disable_existing_loggers": False,
-           "handlers": {"console": {"class": "logging.StreamHandler"}},
-           "root": {"handlers": ["console"], "level": "INFO"}}
 
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
@@ -176,9 +156,7 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = "/static/"; MEDIA_URL = "/media/"
-STATIC_ROOT = BASE_DIR / "static"
-MEDIA_ROOT  = BASE_DIR / "media"
+STATIC_URL = 'static/'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

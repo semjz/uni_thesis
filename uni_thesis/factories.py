@@ -1,7 +1,9 @@
 import factory
-from .models import Professor, Student, User, ThesisDefenceRequest, TimeSlot, DefenceSession
+from .models import Professor, Student, User, ThesisDefenceRequest, TimeSlot, DefenceSession, FieldOfStudy
 from .utils import random_numeric_string
 from datetime import date as _date, datetime, timedelta, time as _time
+
+_FIELD_VALUES = [c.value for c in FieldOfStudy]  # keeps factories in sync with the enum
 
 class UserFactory(factory.django.DjangoModelFactory):
     class Meta:
@@ -27,12 +29,14 @@ class UserFactory(factory.django.DjangoModelFactory):
         return random_numeric_string(10)
 
 
+
+
 class ProfessorFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Professor
 
     user = factory.SubFactory(UserFactory, role="Professor")
-    field_of_study = factory.Iterator(["math", "physics", "computer science"])
+    field_of_study = factory.Iterator(_FIELD_VALUES)
     specialization = factory.Faker("job")
 
 class StudentFactory(factory.django.DjangoModelFactory):
@@ -40,7 +44,7 @@ class StudentFactory(factory.django.DjangoModelFactory):
         model = Student
 
     user = factory.SubFactory(UserFactory, role="Student")
-    field_of_study = factory.Iterator(["math", "physics", "computer science"])
+    field_of_study = factory.Iterator(_FIELD_VALUES)
     level_of_study = factory.Iterator(["BSc", "MSc", "PhD"])
     specialization = factory.Faker("job")
 
