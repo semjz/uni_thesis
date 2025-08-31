@@ -1,40 +1,52 @@
-
 from pathlib import Path
 import environ
 import os
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Initialize environment variables
 env = environ.Env()
-environ.Env.read_env(os.path.join(BASE_DIR, '.env'))  # Load from .env file
 
+# Only read .env locally if it exists (Render uses dashboard env vars)
+env_file = os.path.join(BASE_DIR, ".env")
+if os.path.exists(env_file):
+    environ.Env.read_env(env_file)
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
-
-# SECURITY WARNING: keep the secret key used in production secret!
+# --- Core security / debugging ---
 SECRET_KEY = env("SECRET_KEY")
-
-# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool("DEBUG", False)
-ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
-CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=["http://localhost","http://127.0.0.1"])
+
+# Allow Render + local
+ALLOWED_HOSTS = env.list(
+    "ALLOWED_HOSTS",
+    default=["localhost", "127.0.0.1", ".onrender.com"],
+)
+
+# CSRF: allow Render + local (HTTPS on Render)
+CSRF_TRUSTED_ORIGINS = env.list(
+    "CSRF_TRUSTED_ORIGINS",
+    default=[
+        "https://*.onrender.com",
+        "http://localhost",
+        "http://127.0.0.1",
+    ],
+)
+
 SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", True)
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-
-# Application definition
-
+# --- Apps/Middleware ---
 INSTALLED_APPS = [
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
     'uni_thesis',
     'rest_framework',
     'drf_spectacular',
@@ -57,8 +69,7 @@ ROOT_URLCONF = 'uni_project.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates']
-        ,
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -72,11 +83,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'uni_project.wsgi.application'
 
-
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
-import dj_database_url
+# --- Database ---
 if env("DATABASE_URL", default=None):
     DATABASES = {
         "default": dj_database_url.parse(
@@ -97,25 +104,32 @@ else:
         }
     }
 
-# caching
-
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": env("REDIS_URL", default="redis://localhost:6379/1"),
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+# --- Caching (Redis on prod; in-memory fallback when REDIS_URL absent) ---
+REDIS_URL = env("REDIS_URL", default=None)
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": REDIS_URL,
+            "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
         }
     }
-}
+else:
+    CACHES = {
+        "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}
+    }
 
 CACHE_TTL = 60 * 5
 
+# --- Logging ---
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "root": {"handlers": ["console"], "level": "INFO"},
+}
 
-LOGGING = {"version": 1, "disable_existing_loggers": False,
-           "handlers": {"console": {"class": "logging.StreamHandler"}},
-           "root": {"handlers": ["console"], "level": "INFO"}}
-
+# --- DRF / Schema ---
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -130,52 +144,34 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
 }
 
-
-# Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
-
+# --- Auth ---
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-
-# Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
-
+# --- I18N ---
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
-
 USE_TZ = True
 
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
-
-STATIC_URL = "/static/"; MEDIA_URL = "/media/"
+# --- Static & Media ---
+STATIC_URL = "/static/"
+MEDIA_URL = "/media/"
 STATIC_ROOT = BASE_DIR / "static"
-MEDIA_ROOT  = BASE_DIR / "media"
+MEDIA_ROOT = BASE_DIR / "media"
 
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
+# WhiteNoise: hashed/Compressed static files for production
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
+# --- Defaults ---
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
 AUTH_USER_MODEL = 'uni_thesis.User'
 
+# --- Email (left unchanged as requested) ---
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 MAILERSEND_API_KEY = 'mlsn.21b05116480beddab4b6f12c1c1f9f29ea977f37df8584662b6399d630b505e6'
 EMAIL_USE_TLS = True
