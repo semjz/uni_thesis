@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 from rest_framework import generics, status, serializers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from uni_thesis.models import Student, Professor, TimeSlot, ThesisDefenceRequest, DefenceSession
@@ -100,73 +100,84 @@ class MyTimeSlotDeleteView(generics.DestroyAPIView):
 
 
 class CreateThesisDefenceRequestView(APIView):
-    permission_classes = [IsAuthenticated, IsStudentUserOrAdmin]
+    permission_classes = [IsAuthenticated]  # keep your custom perm too
 
     def post(self, request, student_id: int):
-        # 0) student + single request check
+        # 0) student + single request check (outside tx)
         try:
             student = Student.objects.get(id=student_id)
         except Student.DoesNotExist:
             return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
         if ThesisDefenceRequest.objects.filter(student=student).exists():
-            return Response({"error": "This student already submitted a request."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "This student already submitted a request."},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-        # 1) validate payload
+        # 1) validate payload (outside tx)
         req_ser = ThesisDefenceRequestSerializer(data=request.data, context={"student": student})
         if not req_ser.is_valid():
             return Response(req_ser.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        # 2) get & validate AI suggestion (OUTSIDE tx)
         supervisor_id = request.data.get("supervisor_id")
-        suggestion = suggest_committee_for_request(req_ser.initial_data, supervisor_id=supervisor_id)
 
-        if suggestion.get("status") not in {"success", "model_unavailable"}:
-            return Response(
-                {"error": "Automatic scheduling failed.",
-                 "reason": suggestion.get("message", suggestion.get("status"))},
-                status=status.HTTP_409_CONFLICT,
-            )
+        # 2) atomic: save request → ask AI → book session
+        with transaction.atomic():
+            req = req_ser.save()  # we want this rolled back if anything later fails
 
-        data = suggestion.get("data") or {}
-        slot_key = data.get("suggested_time")
-        d, t1, t2 = _parse_slot_key(slot_key) if slot_key else (None, None, None)
-        if not (data.get("evaluator_id") and data.get("observer_id") and d and t1 and t2):
-            return Response(
-                {"error": "Automatic scheduling failed (no concrete slot).",
-                 "suggestion": suggestion},
-                status=status.HTTP_409_CONFLICT,
-            )
+            suggestion = suggest_committee_for_request(req, supervisor_id=supervisor_id)
+            if suggestion.get("status") not in {"success", "model_unavailable"}:
+                transaction.set_rollback(True)
+                return Response(
+                    {"error": "Automatic scheduling failed.",
+                     "reason": suggestion.get("message", suggestion.get("status"))},
+                    status=status.HTTP_409_CONFLICT,
+                )
 
-        # 3) atomic: create request + book session
-        try:
-            with transaction.atomic():
-                req = req_ser.save()
+            data = suggestion.get("data") or {}
+            slot_key = data.get("suggested_time")
+            d, t1, t2 = _parse_slot_key(slot_key) if slot_key else (None, None, None)
+            if not (data.get("evaluator_id") and data.get("observer_id") and d and t1 and t2):
+                transaction.set_rollback(True)
+                return Response(
+                    {"error": "Automatic scheduling failed (no concrete slot).",
+                     "suggestion": suggestion},
+                    status=status.HTTP_409_CONFLICT,
+                )
 
-                ds_in = {
-                    "request": req.pk,
-                    "evaluator": data["evaluator_id"],
-                    "observer": data["observer_id"],
-                    "date": d,
-                    "start_time": t1,
-                    "end_time": t2,
-                    "location": "Seminar Room A",
-                }
-                ds_ser = DefenceSessionCreateSerializer(data=ds_in)
-                ds_ser.is_valid(raise_exception=True)  # may raise ValidationError
+            ds_in = {
+                "request": req.pk,
+                "evaluator": data["evaluator_id"],
+                "observer": data["observer_id"],
+                "date": d,
+                "start_time": t1,
+                "end_time": t2,
+                "location": "Seminar Room A",
+            }
+            ds_ser = DefenceSessionCreateSerializer(data=ds_in)
+            if not ds_ser.is_valid():
+                transaction.set_rollback(True)
+                return Response(
+                    {"error": "Automatic scheduling failed.", "booking_errors": ds_ser.errors},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            try:
                 session = ds_ser.save()
+            except (serializers.ValidationError, IntegrityError) as e:
+                # Anything that blows up during create() → treat as conflict
+                transaction.set_rollback(True)
+                detail = getattr(e, "detail", str(e))
+                return Response(
+                    {"error": "Automatic scheduling failed.", "booking_errors": detail},
+                    status=status.HTTP_409_CONFLICT,
+                )
 
-        except serializers.ValidationError as e:
-            # Booking failed (e.g., slots not available) → no request left behind
-            return Response(
-                {"error": "Automatic scheduling failed.", "booking_errors": e.detail},
-                status=status.HTTP_409_CONFLICT,
-            )
-
-        # 4) success
+        # success (commit happened)
         return Response(
             {
                 "request": ThesisDefenceRequestSerializer(req).data,
-                "defence_session": DefenceSessionSerializer(session).data,
+                "defence_session": DefenceSessionCreateSerializer(session).data
+                    if hasattr(DefenceSessionCreateSerializer, "Meta") else  # optional
+                {"id": session.pk},  # you likely have a read serializer already
                 "suggestion": suggestion,
             },
             status=status.HTTP_201_CREATED,

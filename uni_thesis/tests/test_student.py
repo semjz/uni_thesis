@@ -23,7 +23,7 @@ class StudentAPITestCase(APITestCase):
                 }
         self.student_user_update_data = {
             "user": {"national_code":"0001111222"},
-            "field_of_study": "Updated",
+            "field_of_study": "arts_humanities",
         }
         self.student = StudentFactory.create()
 
