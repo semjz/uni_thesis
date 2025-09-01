@@ -29,8 +29,6 @@ class UserFactory(factory.django.DjangoModelFactory):
         return random_numeric_string(10)
 
 
-
-
 class ProfessorFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Professor

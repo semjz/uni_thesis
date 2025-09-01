@@ -1,4 +1,5 @@
 from django.db.models import Q
+from drf_spectacular.types import OpenApiTypes
 from rest_framework.generics import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework import generics, status, serializers
@@ -6,7 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db import transaction, IntegrityError
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from uni_thesis.models import Student, Professor, TimeSlot, ThesisDefenceRequest, DefenceSession
 from uni_thesis.permissions import IsProfessorUserOrAdmin, IsTimeslotOwnerOrAdmin, IsStudentUserOrAdmin, IsAdmin
 from uni_thesis.serializers import TimeSlotInSerializer, TimeSlotSerializer, ThesisDefenceRequestSerializer, \
@@ -99,6 +100,15 @@ class MyTimeSlotDeleteView(generics.DestroyAPIView):
         return TimeSlot.objects.filter(professor=prof)
 
 
+@extend_schema(
+    tags=["Thesis Defence"],
+    summary="Create thesis defence request and auto-schedule a session",
+    parameters=[
+        OpenApiParameter("student_id", OpenApiTypes.INT, OpenApiParameter.PATH)
+    ],
+    request=ThesisDefenceRequestSerializer,
+    responses={201: ThesisDefenceRequestSerializer},
+)
 class CreateThesisDefenceRequestView(APIView):
     permission_classes = [IsAuthenticated]  # keep your custom perm too
 
