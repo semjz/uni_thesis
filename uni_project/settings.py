@@ -178,7 +178,6 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"  # collectstatic output
-STATICFILES_DIRS = [BASE_DIR / "static"]  # only if this folder exists
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 MEDIA_URL = "/media/"
 MEDIA_ROOT  = BASE_DIR / "media"
